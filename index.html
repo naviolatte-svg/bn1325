@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ponsel Karakter AU</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; }
+    body {
+      margin: 0; min-height: 100dvh; padding: 16px;
+      display: grid; place-items: center;
+      background: #101014; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: white;
+    }
+    button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible { outline: 3px solid #f4d19d; outline-offset: 5px; }
+    [hidden] { display: none !important; }
+
+    /* Ukuran kanvas ponsel. Otomatis diperkecil agar muat di layar. */
+    .stage { position: relative; width: calc(390px * var(--scale, 1)); height: calc(844px * var(--scale, 1)); }
+    .phone {
+      position: absolute; width: 390px; height: 844px;
+      transform: scale(var(--scale, 1)); transform-origin: top left;
+      border: 7px solid #27272c; border-radius: 54px; overflow: hidden;
+      background: #302943; box-shadow: 0 0 0 2px #47474d, 0 25px 90px #0009;
+      isolation: isolate;
+    }
+    .wallpaper {
+      position: absolute; inset: 0; z-index: -2;
+      background: radial-gradient(ellipse at 85% 18%, #d7b0ac 0%, transparent 46%),
+        radial-gradient(ellipse at 8% 75%, #9e83b1 0%, transparent 48%),
+        linear-gradient(155deg, #4a466b, #49354f 55%, #191e37);
+    }
+    .island { position: absolute; z-index: 10; width: 116px; height: 33px; border-radius: 24px; background: #050505; top: 12px; left: 50%; transform: translateX(-50%); }
+    .status { position: absolute; z-index: 9; top: 23px; left: 30px; right: 26px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; pointer-events: none; }
+    .indicators { display: flex; align-items: center; gap: 6px; }
+    .signal { display: flex; align-items: end; gap: 2px; height: 12px; }
+    .signal i { width: 3px; background: currentColor; border-radius: 1px; }
+    .signal i:nth-child(1) { height: 4px; }
+    .signal i:nth-child(2) { height: 6px; }
+    .signal i:nth-child(3) { height: 9px; }
+    .signal i:nth-child(4) { height: 12px; }
+    .battery { position: relative; width: 23px; height: 11px; padding: 1px; border: 1px solid #fffa; border-radius: 3px; }
+    .battery::before { content: ""; display: block; height: 100%; width: 85%; border-radius: 1px; background: currentColor; }
+    .battery::after { content: ""; position: absolute; right: -3px; top: 3px; height: 4px; width: 2px; background: #fffa; border-radius: 1px; }
+    .screen { position: absolute; inset: 0; }
+    .home-bar { position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); width: 132px; height: 5px; border-radius: 9px; background: white; pointer-events: none; z-index: 10; }
+
+    /* Layar terkunci */
+    .lock { text-align: center; padding: 95px 20px 40px; }
+    .lock-symbol { margin-bottom: 12px; }
+    .date { margin: 0; font-size: 20px; font-weight: 500; }
+    .clock { margin: -1px 0 0; font-size: 90px; letter-spacing: -5px; font-weight: 650; }
+    .notification { position: absolute; left: 14px; right: 14px; bottom: 141px; padding: 15px; display: flex; gap: 12px; text-align: left; border: 1px solid #fff2; border-radius: 24px; background: #ece7ef9c; backdrop-filter: blur(24px); color: #22212a; }
+    .notification-icon { align-self: center; padding: 9px; border-radius: 11px; background: #36c85c; }
+    .notification p { margin: 4px 0 0; font-size: 14px; }
+    .notification small { float: right; margin-left: 10px; color: #48424d; }
+    .unlock { position: absolute; bottom: 43px; left: 0; width: 100%; border: 0; background: transparent; font-size: 14px; padding: 16px; }
+    .unlock span { display: block; margin-bottom: 7px; font-size: 24px; }
+
+    /* Layar PIN */
+    .passcode { padding: 120px 34px 50px; text-align: center; background: #1d152a75; backdrop-filter: blur(30px); }
+    .passcode h1 { margin: 0 0 25px; font-size: 23px; font-weight: 500; }
+    .dots { display: flex; justify-content: center; gap: 24px; }
+    .dot { width: 13px; height: 13px; border: 1.5px solid white; border-radius: 50%; }
+    .dot.filled { background: white; }
+    .pin-feedback { min-height: 18px; margin: 16px 0 20px; font-size: 13px; }
+    .keypad { display: grid; grid-template-columns: repeat(3, 76px); justify-content: space-between; row-gap: 19px; }
+    .key { width: 76px; height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: #ffffff29; transition: background .15s; }
+    .key:active { background: #ffffff65; }
+    .digit { font-size: 34px; line-height: 37px; font-weight: 400; }
+    .letters { min-height: 12px; font-size: 10px; letter-spacing: 2px; margin-left: 2px; }
+    .zero { grid-column: 2; }
+    .pin-actions { position: absolute; left: 34px; right: 34px; bottom: 60px; display: flex; justify-content: space-between; }
+    .text-button { border: 0; background: transparent; padding: 12px 0; font-size: 15px; }
+    .shake { animation: shake .35s ease; }
+    @keyframes shake { 25%,75% { transform: translateX(-9px); } 50% { transform: translateX(9px); } }
+
+    /* Menu dan pesan dari versi sebelumnya */
+    .home { padding: 90px 22px 40px; }
+    .widget { padding: 20px; border: 1px solid #fff3; border-radius: 25px; background: #ffffff21; backdrop-filter: blur(20px); }
+    .widget p { margin: 0 0 8px; font-size: 14px; }
+    .widget h1 { font-size: 26px; margin: 0; font-weight: 600; }
+    .apps { margin-top: 30px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px 10px; }
+    .app { border: 0; background: transparent; display: grid; justify-items: center; gap: 8px; padding: 0; font-size: 12px; }
+    .app-icon { display: grid; place-items: center; width: 60px; height: 60px; border-radius: 15px; font-size: 29px; box-shadow: inset 0 1px #fff5; }
+    .green { background: linear-gradient(#6be978, #20b742); }
+    .gray { background: linear-gradient(#aaaeb8, #5b6170); }
+    .dock { position: absolute; left: 14px; right: 14px; bottom: 28px; padding: 14px; border-radius: 30px; background: #ffffff29; backdrop-filter: blur(20px); display: flex; justify-content: space-around; }
+    .dock .app-icon { width: 54px; height: 54px; }
+    .messages { padding: 75px 20px 40px; color: #17171c; background: #f4f4f8; }
+    .messages h1 { margin-top: 30px; font-size: 23px; }
+    .back { border: 0; padding: 10px 0; background: transparent; color: #007aff; }
+    .bubble { max-width: 90%; padding: 14px; border-radius: 18px; line-height: 1.5; background: #e2e2e9; }
+    .messages small { color: #707079; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+    /* HOME SCREEN: widget, ikon SVG, dan aplikasi AU. */
+    .wallpaper { background-position: center; background-size: cover; background-repeat: no-repeat; }
+    .home { padding: 78px 20px 40px; }
+    .widgets { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .home-widget { height:160px; border:0; border-radius:24px; padding:16px; text-align:left; box-shadow:0 4px 14px #0001; }
+    .calendar-widget { color:#18181c; background:#fff; }
+    .calendar-widget .weekday { color:#f0444a; font-size:13px; font-weight:600; }
+    .calendar-widget .day { display:block; font-size:45px; line-height:1.05; font-weight:300; margin-bottom:10px; }
+    .widget-event { display:block; border-left:3px solid #ae7adc; padding-left:7px; font-size:11px; line-height:1.35; }
+    .weather-widget { background:linear-gradient(#187fe2,#68b5f4); color:white; }
+    .weather-widget .city { font-size:16px; }
+    .temperature { display:block; font-size:44px; line-height:1.2; font-weight:300; }
+    .weather-widget small { display:block; margin-top:4px; font-size:11px; }
+    .weather-widget svg { float:right; width:27px; height:27px; }
+    .apps { margin-top:26px; row-gap:23px; }
+    .app { position:relative; gap:7px; text-shadow:0 1px 4px #0008; }
+    .app-icon { overflow:hidden; box-shadow:0 2px 6px #0002; background:transparent; }
+    .app-icon svg { display:block; width:100%; height:100%; }
+    .badge { position:absolute; top:-5px; right:1px; min-width:21px; height:21px; padding:2px 5px; border-radius:20px; background:#ff3b30; font-size:13px; text-align:center; text-shadow:none; }
+    .dock .app-icon { width:60px; height:60px; }
+    .search-pill { position:absolute; bottom:139px; left:50%; transform:translateX(-50%); border:0; border-radius:20px; padding:8px 15px; background:#ffffff35; font-size:12px; }
+    .app-panel { padding:73px 0 30px; background:#f2f2f7; color:#17171c; }
+    .panel-header { padding:0 20px 12px; border-bottom:1px solid #dddde5; }
+    .panel-header h1 { margin:6px 0 0; font-size:29px; letter-spacing:-.6px; }
+    .panel-content { height:calc(100% - 93px); padding:20px; overflow-y:auto; overscroll-behavior:contain; }
+    .panel-content p { line-height:1.5; }
+    .muted { color:#737381; font-size:13px; }
+    .card { background:white; border-radius:16px; padding:17px; margin-bottom:14px; }
+    .card h2 { font-size:18px; margin:0 0 8px; }
+    .list-row { display:block; width:100%; text-align:left; background:white; color:#17171c; border:0; padding:17px; border-radius:14px; margin-bottom:10px; }
+    .list-row strong,.list-row small { display:block; }
+    .list-row small { color:#747482; margin-top:5px; }
+    .primary { border:0; border-radius:13px; background:#007aff; color:white; padding:13px 17px; font-weight:500; }
+    .secondary { border:0; border-radius:13px; background:#e4e4eb; color:#292934; padding:13px 17px; }
+    .file-label { display:inline-block; cursor:pointer; }
+    .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-top:18px; }
+    .photo-grid button { aspect-ratio:1; border:0; border-radius:6px; padding:0; overflow:hidden; background:#e2dce8; }
+    .photo-grid img { width:100%; height:100%; object-fit:cover; }
+    .large-photo { width:100%; max-height:410px; object-fit:contain; border-radius:14px; background:#e1e1e8; }
+    .month-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; gap:5px; }
+    .month-header button { padding:8px 13px; border:0; background:white; color:#007aff; border-radius:10px; }
+    .month-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; text-align:center; }
+    .month-grid button { height:34px; border:0; border-radius:50%; background:white; color:#222; font-size:14px; }
+    .month-grid button.selected { background:#ff3b30; color:white; }
+    .month-grid small { font-size:10px; padding:8px 0; color:#777; }
+    .weather-card { background:linear-gradient(#2276cc,#77b6e7); color:white; text-align:center; }
+    .weather-card .temperature { font-size:70px; }
+    .hourly { display:flex; gap:14px; overflow:auto; padding:15px 0; }
+    .hourly div { text-align:center; min-width:43px; font-size:12px; line-height:2; }
+    .note-body { white-space:pre-wrap; line-height:1.8; }
+    .stopwatch { text-align:center; font-size:48px; font-variant-numeric:tabular-nums; margin:30px 0; font-weight:300; }
+    .action-row { display:flex; gap:10px; flex-wrap:wrap; }
+    input[type=search] { width:100%; padding:13px; border:0; border-radius:12px; color:#17171c; background:#e3e3ea; font:inherit; }
+    .search-results { margin-top:16px; }
+    audio { width:100%; margin-top:15px; }
+    .phone:has(.app-panel:not([hidden])) .status,
+    .phone:has(.messages:not([hidden])) .status { color:#17171c; }
+    .phone:has(.app-panel:not([hidden])) .home-bar,
+    .phone:has(.messages:not([hidden])) .home-bar { background:#17171c; }
+
+    .notification-copy { flex:1; min-width:0; }
+    .contact-header { text-align:center; padding:10px 0 24px; border-bottom:1px solid #dedee7; }
+    .contact-avatar { width:56px; height:56px; display:grid; place-items:center; margin:auto; border-radius:50%; background:linear-gradient(#b2b4c2,#818599); color:white; font-size:25px; }
+    .contact-header h1 { margin:10px 0 0; font-size:19px; font-weight:600; }
+    .message-date { text-align:center; font-size:12px; color:#7b7b88; margin:24px 0; }
+    .incoming-message { display:flex; align-items:flex-end; gap:8px; }
+    .incoming-message .bubble { margin:0; border-bottom-left-radius:5px; padding:11px 17px; }
+    .incoming-message small { padding-bottom:4px; font-size:11px; }
+    .weather-symbol { width:64px; height:64px; margin:auto; }
+    .weather-symbol svg { width:100%; height:100%; }
+    .weather-widget.night,.weather-card.night { background:linear-gradient(#18284e,#445d83); }
+    .weather-widget small { line-height:1.2; }
+    .weather-attribution { font-size:12px; color:#69697a; text-align:center; }
+    .weather-attribution a { color:#007aff; }
+    .weather-update { font-size:12px; }
+
+    /* PESAN: daftar kontak, percakapan, keyboard, dan banner di dalam ponsel. */
+    .messages { padding:66px 0 22px; display:flex; flex-direction:column; background:#fff; }
+    .messages-list { padding:0 20px; }
+    .messages-list h1 { margin:22px 0 25px; font-size:32px; letter-spacing:-1px; }
+    .messages-list .back { font-size:16px; }
+    .chat-contact-row { display:flex; width:100%; border:0; padding:18px 0; gap:13px; align-items:center; text-align:left; color:#161619; background:transparent; border-top:1px solid #eeeef1; border-bottom:1px solid #eeeef1; }
+    .chat-avatar { flex-shrink:0; position:relative; display:grid; place-items:center; width:52px; height:52px; border-radius:50%; background:linear-gradient(#b7bac6,#8b8f9e); color:#fff; overflow:hidden; font-size:24px; }
+    .chat-avatar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+    .chat-contact-info { flex:1; min-width:0; }
+    .chat-contact-info strong { font-size:17px; }
+    .chat-contact-info p { margin:6px 0 0; color:#8b8b92; font-size:14px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .chat-contact-top { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .chat-contact-top time { font-size:12px; font-weight:400; color:#8b8b92; }
+    .chat-unread-dot { width:9px; height:9px; background:#007aff; border-radius:50%; flex-shrink:0; }
+    .chat-conversation { display:flex; flex-direction:column; flex:1; min-height:0; }
+    .imessage-header { position:relative; min-height:112px; padding:5px 15px 12px; text-align:center; background:#fafafbe8; border-bottom:1px solid #dedee4; }
+    .imessage-header .back { position:absolute; top:15px; left:13px; font-size:17px; }
+    .imessage-header .chat-avatar { width:48px; height:48px; margin:auto; font-size:22px; }
+    .imessage-header h1 { margin:7px 0 0; font-size:14px; letter-spacing:0; font-weight:600; }
+    .imessage-service { margin:7px 0 0; text-align:center; color:#8c8c93; font-size:11px; }
+    .chat-log { flex:1; min-height:0; overflow-y:auto; padding:0 15px 16px; overscroll-behavior:contain; }
+    .chat-date { margin:12px 0 19px; text-align:center; color:#8c8c93; font-size:11px; font-weight:500; }
+    .chat-row { display:flex; margin:6px 0; position:relative; }
+    .chat-row.me { justify-content:flex-end; }
+    .chat-message { position:relative; max-width:78%; padding:10px 14px; border-radius:19px; background:#e9e9eb; color:#17171b; white-space:pre-wrap; overflow-wrap:anywhere; font-size:16px; line-height:1.35; }
+    .chat-row.hao .chat-message { border-bottom-left-radius:5px; }
+    .chat-row.me .chat-message { background:#007aff; color:#fff; border-bottom-right-radius:5px; }
+    .chat-photo { max-width:75%; width:220px; border:0; border-radius:17px; overflow:hidden; padding:0; background:#ececf0; color:#74747d; text-align:left; }
+    .chat-photo img { width:100%; max-height:280px; object-fit:cover; display:block; }
+    .chat-photo .photo-error { display:block; min-height:120px; padding:35px 20px; text-align:center; font-size:13px; }
+    .chat-receipt { text-align:right; padding:0 4px 5px; color:#8b8b93; font-size:10px; }
+    .chat-time { margin:10px 0; text-align:center; font-size:10px; color:#93939b; }
+    .typing-bubble { display:flex; gap:5px; align-items:center; width:57px; height:33px; border-radius:18px; background:#e9e9eb; margin:7px 0; padding:0 12px; }
+    .typing-bubble i { width:7px; height:7px; border-radius:50%; background:#a3a3aa; animation:typing-pulse 1s infinite; }
+    .typing-bubble i:nth-child(2) { animation-delay:.15s; }
+    .typing-bubble i:nth-child(3) { animation-delay:.3s; }
+    @keyframes typing-pulse { 50% { opacity:.35; transform:translateY(-3px); } }
+    .chat-composer { padding:8px 11px 11px; display:flex; align-items:flex-end; gap:8px; background:#fff; border-top:1px solid #f0f0f3; }
+    .chat-compose { flex:1; min-width:0; min-height:37px; padding:8px 12px; border:1px solid #c9c9d0; border-radius:20px; background:white; color:#161619; text-align:left; line-height:1.25; font-size:15px; overflow-wrap:anywhere; }
+    .chat-compose.placeholder { color:#a0a0a8; }
+    .chat-send { display:grid; place-items:center; flex-shrink:0; width:32px; height:32px; border:0; border-radius:50%; background:#007aff; color:white; font-size:23px; padding:0; margin-bottom:2px; }
+    .chat-send:disabled { background:#d4d4db; cursor:default; }
+    .chat-hint { margin:0; padding:0 13px 8px; color:#868690; font-size:10px; text-align:center; background:white; }
+    .chat-keyboard { flex-shrink:0; background:#cfd2d9; color:#141417; padding:0 4px 13px; }
+    .keyboard-prediction { width:100%; background:#d9dce2; color:#33333d; border:0; border-bottom:1px solid #bec2ca; padding:11px 9px; margin-bottom:10px; font-size:13px; min-height:38px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .key-row { display:flex; justify-content:center; gap:5px; margin:0 0 11px; }
+    .letter-key { flex:1; min-width:0; height:39px; padding:0; border:0; border-radius:5px; background:#fff; color:#17171a; font-size:21px; box-shadow:0 1px 1px #8c9098; touch-action:manipulation; }
+    .letter-key:active { background:#aeb8cb; }
+    .key-row.middle { padding:0 17px; }
+    .letter-key.wide { flex:1.5; background:#aeb4bf; font-size:17px; }
+    .letter-key.space { flex:5; font-size:15px; }
+    .keyboard-bottom { margin:0; }
+    .keyboard-bottom .letter-key { height:36px; font-size:13px; }
+    .chat-keyboard button:disabled { opacity:.5; }
+    .chat-banner { position:absolute; z-index:30; top:58px; left:10px; right:10px; display:flex; align-items:center; gap:6px; padding:9px; border-radius:23px; color:#202027; background:#f7f5f6ee; backdrop-filter:blur(24px); box-shadow:0 7px 30px #0003; animation:banner-in .25s ease-out; }
+    @keyframes banner-in { from { opacity:0; transform:translateY(-20px); } }
+    .banner-open { display:flex; align-items:center; gap:10px; flex:1; min-width:0; border:0; background:transparent; padding:2px; color:inherit; text-align:left; }
+    .banner-open .chat-avatar { width:41px; height:41px; font-size:19px; }
+    .banner-copy { flex:1; min-width:0; font-size:13px; }
+    .banner-copy strong { display:block; margin-bottom:4px; }
+    .banner-copy span { display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+    .banner-close { border:0; background:transparent; color:#777782; padding:8px; font-size:17px; }
+    .banner-caption { font-size:10px; color:#7d7d85; margin-left:auto; }
+    .chat-lightbox { position:absolute; z-index:40; inset:0; padding:75px 14px 35px; background:#060609f5; display:flex; flex-direction:column; gap:15px; }
+    .chat-lightbox .back { align-self:flex-start; color:white; }
+    .chat-lightbox img { width:100%; height:calc(100% - 65px); object-fit:contain; }
+    .chat-lightbox p { text-align:center; }
+    .messages-footer { flex-shrink:0; }
+    .notification[hidden] { display:none; }
+
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <main class="phone" aria-label="Ponsel karakter AU">
+      <div class="wallpaper" aria-hidden="true"></div>
+      <div class="island" aria-hidden="true"></div>
+      <div class="status" aria-hidden="true">
+        <span data-live-time>--:--</span>
+        <div class="indicators">
+          <span class="signal"><i></i><i></i><i></i><i></i></span>
+          <svg width="16" height="12" viewBox="0 0 20 15" fill="none"><path d="M1 5Q10 -2 19 5M4 8Q10 3 16 8M7 11Q10 8 13 11" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="14" r="1" fill="currentColor"/></svg>
+          <span class="battery"></span>
+        </div>
+      </div>
+
+      <section id="lock" class="screen lock" aria-label="Layar terkunci">
+        <div class="lock-symbol" aria-hidden="true">
+          <svg width="20" height="25" viewBox="0 0 20 25" fill="currentColor"><path d="M5 10V6a5 5 0 0 1 10 0v4h-2V6a3 3 0 0 0-6 0v4Z"/><rect x="2" y="9" width="16" height="14" rx="4"/></svg>
+        </div>
+        <p class="date" data-live-date></p>
+        <div class="clock" data-live-time>--:--</div>
+        <button class="notification" type="button" data-action="unlock">
+          <span class="notification-icon" aria-hidden="true">💬</span>
+          <span class="notification-copy"><small>sekarang</small><strong>jjangguri</strong><p>bin?</p></span>
+        </button>
+        <button class="unlock" type="button" data-action="unlock"><span aria-hidden="true">⌃</span>Geser ke atas atau klik untuk membuka</button>
+      </section>
+
+      <section id="passcode" class="screen passcode" aria-labelledby="pin-title" hidden>
+        <h1 id="pin-title" tabindex="-1">Enter Passcode</h1>
+        <div class="dots" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+        <p id="pin-feedback" class="pin-feedback" role="status" aria-live="polite"></p>
+        <div class="keypad" aria-label="Papan angka PIN">
+          <button class="key" type="button" data-digit="1" aria-label="1"><span class="digit">1</span><span class="letters">&nbsp;</span></button>
+          <button class="key" type="button" data-digit="2" aria-label="2"><span class="digit">2</span><span class="letters">ABC</span></button>
+          <button class="key" type="button" data-digit="3" aria-label="3"><span class="digit">3</span><span class="letters">DEF</span></button>
+          <button class="key" type="button" data-digit="4" aria-label="4"><span class="digit">4</span><span class="letters">GHI</span></button>
+          <button class="key" type="button" data-digit="5" aria-label="5"><span class="digit">5</span><span class="letters">JKL</span></button>
+          <button class="key" type="button" data-digit="6" aria-label="6"><span class="digit">6</span><span class="letters">MNO</span></button>
+          <button class="key" type="button" data-digit="7" aria-label="7"><span class="digit">7</span><span class="letters">PQRS</span></button>
+          <button class="key" type="button" data-digit="8" aria-label="8"><span class="digit">8</span><span class="letters">TUV</span></button>
+          <button class="key" type="button" data-digit="9" aria-label="9"><span class="digit">9</span><span class="letters">WXYZ</span></button>
+          <button class="key zero" type="button" data-digit="0" aria-label="0"><span class="digit">0</span></button>
+        </div>
+        <div class="pin-actions">
+          <button class="text-button" type="button" data-action="cancel">Cancel</button>
+          <button id="delete" class="text-button" type="button" data-action="delete" hidden>Delete</button>
+        </div>
+      </section>
+
+      <section id="home" class="screen home" aria-label="Home screen" hidden>
+        <div class="widgets">
+          <button class="home-widget calendar-widget" type="button" data-open="calendar" aria-label="Buka widget Calendar">
+            <span class="weekday" id="widget-weekday"></span><span class="day" id="widget-day"></span>
+            <span class="widget-event" id="widget-event">Tidak ada agenda</span>
+          </button>
+          <button class="home-widget weather-widget" type="button" data-open="weather" aria-label="Buka widget Weather">
+            <span id="widget-weather-symbol" aria-hidden="true"></span>
+            <span id="widget-city" class="city">Seoul</span><span id="widget-temp" class="temperature">--°</span>
+            <small id="widget-condition">Memuat cuaca…</small><small id="widget-high-low">H:--° L:--°</small>
+          </button>
+        </div>
+        <div id="app-grid" class="apps"></div>
+        <button class="search-pill" type="button" data-open="search">⌕ Search</button>
+        <div id="app-dock" class="dock"></div>
+      </section>
+
+      <section id="app-panel" class="screen app-panel" hidden>
+        <header class="panel-header"><button class="back" type="button" data-action="home">‹ Home</button><h1 id="panel-title"></h1></header>
+        <div id="panel-content" class="panel-content"></div>
+      </section>
+
+      <section id="messages" class="screen messages" aria-label="Pesan" hidden>
+        <div id="messages-list" class="messages-list">
+          <button class="back" type="button" data-action="home">‹ Home</button>
+          <h1>Messages</h1>
+          <button id="chat-contact-row" class="chat-contact-row" type="button" data-chat="open-contact"></button>
+        </div>
+        <div id="chat-conversation" class="chat-conversation" hidden>
+          <header class="imessage-header">
+            <button class="back" type="button" data-chat="back-list">‹ Messages</button>
+            <div id="chat-header-avatar"></div>
+            <h1 id="chat-contact-name"></h1>
+          </header>
+          <div id="chat-log" class="chat-log" role="log" aria-label="Percakapan dengan jjangguri" aria-live="polite" aria-relevant="additions"></div>
+          <footer class="messages-footer">
+            <div class="chat-composer">
+              <button id="chat-compose" class="chat-compose placeholder" type="button" data-chat="show-keyboard" aria-label="Tulis balasan" aria-expanded="false" aria-controls="chat-keyboard">iMessage</button>
+              <button id="chat-send" class="chat-send" type="button" data-chat="send" aria-label="Kirim balasan" disabled>↑</button>
+            </div>
+            <p id="chat-hint" class="chat-hint"></p>
+            <div id="chat-keyboard" class="chat-keyboard" aria-label="Keyboard simulasi" hidden></div>
+          </footer>
+        </div>
+      </section>
+      <div id="chat-banner" class="chat-banner" role="status" aria-live="polite" hidden>
+        <button class="banner-open" type="button" data-chat="open-banner"><span id="banner-avatar"></span><span class="banner-copy"><strong id="banner-name"></strong><span id="banner-text"></span></span><small class="banner-caption">sekarang</small></button>
+        <button class="banner-close" type="button" data-chat="dismiss-banner" aria-label="Tutup notifikasi">×</button>
+      </div>
+      <div id="chat-lightbox" class="chat-lightbox" role="dialog" aria-modal="true" aria-label="Foto dalam percakapan" hidden>
+        <button class="back" type="button" data-chat="close-photo">‹ Tutup foto</button>
+        <img id="chat-lightbox-image" alt="">
+        <p id="chat-photo-error" hidden>Foto tidak tersedia.</p>
+      </div>
+      <div class="home-bar" aria-hidden="true"></div>
+    </main>
+  </div>
+
+  <script>
+    // UBAH PIN DI SINI. Gunakan tepat 4 angka dan tetap pakai tanda kutip.
+    const CORRECT_PIN = "1325";
+
+    let enteredPin = "";
+    let unlocked = false;
+    let checking = false;
+    let currentScreen = "lock";
+    let pinTimer;
+    let touchStartY = null;
+    let pendingChatOpen = false;
+    const screens = document.querySelectorAll(".screen");
+    const dots = document.querySelectorAll(".dot");
+    const dotsContainer = document.querySelector(".dots");
+    const feedback = document.getElementById("pin-feedback");
+    const deleteButton = document.getElementById("delete");
+
+    function fitPhone() {
+      const scale = Math.min(1, (window.innerWidth - 32) / 390, (window.innerHeight - 32) / 844);
+      document.documentElement.style.setProperty("--scale", Math.max(0.1, scale));
+    }
+    window.addEventListener("resize", fitPhone);
+    fitPhone();
+
+    function renderDots() {
+      dots.forEach((dot, index) => dot.classList.toggle("filled", index < enteredPin.length));
+      deleteButton.hidden = enteredPin.length === 0;
+    }
+    function clearPin() {
+      clearTimeout(pinTimer);
+      checking = false;
+      enteredPin = "";
+      feedback.textContent = "";
+      dotsContainer.classList.remove("shake");
+      renderDots();
+    }
+    function showScreen(id, moveFocus = true) {
+      if (!["lock", "passcode"].includes(id) && !unlocked) id = "passcode";
+      currentScreen = id;
+      screens.forEach(screen => { screen.hidden = screen.id !== id; });
+      handleChatScreenChange(id);
+      if (moveFocus) document.querySelector(`#${id} button:not([hidden]), #${id} [tabindex]`)?.focus({ preventScroll: true });
+    }
+    function openPasscode() { clearPin(); showScreen("passcode"); }
+    function enterDigit(digit) {
+      if (currentScreen !== "passcode" || checking || !/^\d$/.test(digit)) return;
+      feedback.textContent = "";
+      dotsContainer.classList.remove("shake");
+      enteredPin += digit;
+      renderDots();
+      if (enteredPin.length !== 4) return;
+      checking = true;
+      pinTimer = setTimeout(() => {
+        if (enteredPin === CORRECT_PIN) {
+          unlocked = true;
+          clearPin();
+          showScreen(pendingChatOpen ? "messages" : "home");
+          if (pendingChatOpen) { pendingChatOpen=false; openConversation(); }
+        } else {
+          enteredPin = "";
+          checking = false;
+          renderDots();
+          feedback.textContent = "PIN salah. Coba lagi.";
+          dotsContainer.classList.add("shake");
+        }
+      }, 220);
+    }
+    function deleteDigit() {
+      if (checking) return;
+      enteredPin = enteredPin.slice(0, -1);
+      renderDots();
+    }
+    document.querySelectorAll("[data-digit]").forEach(button => {
+      button.addEventListener("click", () => enterDigit(button.dataset.digit));
+    });
+    document.querySelectorAll("[data-action]").forEach(button => {
+      button.addEventListener("click", () => {
+        switch (button.dataset.action) {
+          case "unlock": pendingChatOpen=button.classList.contains("notification"); openPasscode(); break;
+          case "cancel": pendingChatOpen=false; clearPin(); showScreen("lock"); break;
+          case "delete": deleteDigit(); break;
+          case "lock": unlocked = false; clearPin(); showScreen("lock"); break;
+          case "home": showScreen("home"); break;
+          case "messages": showScreen("messages"); break;
+        }
+      });
+    });
+    document.addEventListener("keydown", event => {
+      if (currentScreen !== "passcode" || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (/^\d$/.test(event.key)) { event.preventDefault(); enterDigit(event.key); }
+      if (event.key === "Backspace") { event.preventDefault(); deleteDigit(); }
+      if (event.key === "Escape") { pendingChatOpen=false; clearPin(); showScreen("lock"); }
+    });
+    const lockScreen = document.getElementById("lock");
+    lockScreen.addEventListener("touchstart", event => { touchStartY = event.changedTouches[0].clientY; }, { passive: true });
+    lockScreen.addEventListener("touchend", event => {
+      if (currentScreen === "lock" && touchStartY !== null && touchStartY - event.changedTouches[0].clientY > 45) openPasscode();
+      touchStartY = null;
+    }, { passive: true });
+    lockScreen.addEventListener("touchcancel", () => { touchStartY = null; }, { passive: true });
+
+    // ===== KONTEN AU: ubah nama file dan teks di bagian ini. =====
+    // Simpan foto ini di folder yang SAMA dengan index.html.
+    const WALLPAPER = "wallpaper shb.jpeg";
+    const GALLERY = ["haobin1.jpeg", "haobin2.jpeg", "haobin3.jpeg", "haobin4.jpeg", "haobin5.jpeg", "haobin6.jpeg", "haobin7.jpeg", "haobin8.jpeg"]; // Contoh: ["foto-1.jpg", "foto-2.jpg"]
+    const STORY_EVENTS = {
+      "2026-10-17": ["16.00 — Shooting", "21.06 — Pesan dari nomor tak dikenal"],
+      "2026-10-21": ["19.00 — Kembalikan buku"]
+    };
+    const NOTES = [
+      { title: "PENTING", text: "Beli gift anniv.\nDatang sebelum jam empat.\nJangan bilang aku masih ingat." },
+      { title: "Tempat biasa", text: "Meja di dekat jendela.\nDua minuman.\nSatu hal yang belum sempat aku bilang." },
+      { title: "Daftar belanja", text: "Susu\nRoti\nBaterai\nPayung baru" }
+    ];
+    // Cuaca Seoul memakai Open-Meteo. Waktu UI mengikuti perangkat pembaca.
+    const WEATHER = { city: "Seoul", latitude: 37.5665, longitude: 126.9780, timeZone: "Asia/Seoul" };
+
+
+    // ===== EDIT PERCAKAPAN DI SINI =====
+    // Foto: simpan file di folder yang sama dengan index.html.
+    // from: "hao" = bubble kiri; "me" = bubble biru di kanan.
+    // afterMs / delay: waktu tunggu dalam milidetik (1000 = 1 detik).
+    const CHAT = {
+      contact: { name: "jjangguri", photo: "haobin1.jpeg", initial: "H" },
+      initialMessages: [
+        { from: "hao", type: "text", text: "bin?" }
+      ],
+      steps: [
+        {
+          reply: "iya, kakkk? kenapa?",
+          incoming: [
+            { type: "text", text: "lagi ngapainn?", delay: 1400 },
+            { type: "image", src: "haobin2.jpeg", alt: "Foto yang dikirim Hao", delay: 1800 },
+            { type: "text", text: "aku nemu foto ini tadi", delay: 1400 }
+          ]
+        },
+        {
+          reply: "kok masih di simpen?",
+          incoming: [
+            { type: "text", text: "ya masih lah", delay: 1500 },
+            { type: "text", text: "kan itu sama kamu", delay: 1800 }
+          ]
+        },
+        {
+          reply: "cieeee.",
+          // Opsional: tambahkan replyImage: "haobin3.jpeg" untuk mengirim foto juga.
+          incoming: [
+            { type: "text", text: "kangen ga?", delay: 1600 }
+          ]
+        }
+      ],
+      // Pesan otomatis dihitung sejak PIN pertama kali berhasil dibuka.
+      // Banner muncul jika reader sedang di luar percakapan jjangguri.
+      autoIncoming: [
+        { afterMs: 15000, type: "text", text: "bin, lagi sibuk?" }
+      ],
+      bannerDuration: 6000
+    };
+
+    const svg = body => `<svg viewBox="0 0 60 60" aria-hidden="true">${body}</svg>`;
+    const base = color => `<rect width="60" height="60" rx="14" fill="${color}"/>`;
+    const ICONS = {
+      messages: svg(base('#35ca59')+'<path d="M47 28c0 10-8 16-18 16l-10 5 2-8C10 36 10 21 19 16c12-8 28-2 28 12" fill="white"/>'),
+      phone: svg(base('#35ca59')+'<path d="M18 13l9 10-6 6c3 6 6 9 11 11l6-6 10 9c-3 12-14 8-23 0C13 33 8 19 18 13" fill="white" transform="translate(0 -1)"/>'),
+      safari: svg(base('#fafafa')+'<circle cx="30" cy="30" r="25" fill="#1ba7ee"/><circle cx="30" cy="30" r="21" fill="none" stroke="#fff" stroke-dasharray="1 4" stroke-width="3"/><path d="M40 16L33 33 20 44 27 27Z" fill="white"/><path d="M40 16L33 33 27 27Z" fill="#ff514b"/>'),
+      music: svg(base('#fc4968')+'<path d="M27 18v24m0-21 17-4v20M27 18l17-4v8l-17 4" stroke="white" stroke-width="4" fill="none"/><ellipse cx="21" cy="43" rx="7" ry="5" fill="white"/><ellipse cx="38" cy="38" rx="7" ry="5" fill="white"/>'),
+      mail: svg(base('#1998f5')+'<rect x="10" y="17" width="40" height="28" rx="3" fill="white"/><path d="M11 18l19 15 19-15" fill="none" stroke="#1998f5" stroke-width="3"/>'),
+      calendar: svg(base('white')+'<text data-calendar-weekday x="30" y="16" text-anchor="middle" font-family="sans-serif" font-size="9" fill="#f34c49"></text><text data-calendar-day x="30" y="47" text-anchor="middle" font-family="sans-serif" font-weight="300" font-size="34" fill="#121212"></text>'),
+      notes: svg(base('#fff')+'<path d="M0 14Q0 0 14 0h32q14 0 14 14v6H0Z" fill="#ffcf49"/><path d="M0 23h60M9 33h42M9 42h42M9 51h42" stroke="#d5d5da"/>'),
+      clock: svg(base('#101010')+'<circle cx="30" cy="30" r="26" fill="white"/><circle cx="30" cy="30" r="22" fill="none" stroke="#252525" stroke-width="2" stroke-dasharray="1 10.5"/><path data-clock-hour d="M30 30V17" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/><path data-clock-minute d="M30 30V10" stroke="#222" stroke-width="2" fill="none" stroke-linecap="round"/><path data-clock-second d="M30 35V9" stroke="#ef8f24" stroke-width="1"/><circle cx="30" cy="30" r="2" fill="#ef8f24"/>'),
+      weather: svg(base('#2d9ded')+'<circle cx="23" cy="23" r="12" fill="#ffda52"/><path d="M22 45a10 10 0 0 1-1-20 13 13 0 0 1 25 1 9 9 0 0 1 0 19Z" fill="white"/>'),
+      settings: svg(base('#9a9ba1')+'<g transform="translate(30 30)" fill="none" stroke="#e7e7eb"><circle r="18" stroke-width="8" stroke-dasharray="5 3"/><circle r="10" stroke-width="6"/></g>'),
+      maps: svg(base('#d4e5cf')+'<path d="M-5 16l70 25M18-5L8 65M55-5L29 65" stroke="white" stroke-width="9"/><path d="M-5 16l70 25" stroke="#f8cc63" stroke-width="5"/><path d="M39 14c-15 0-14 17 0 29 14-12 15-29 0-29" fill="#f24f45"/><circle cx="39" cy="25" r="4" fill="white"/>'),
+      instagram: svg('<defs><linearGradient id="ig" x2="1" y2="1"><stop stop-color="#8036cb"/><stop offset=".55" stop-color="#ed3288"/><stop offset="1" stop-color="#ffbd58"/></linearGradient></defs>'+base('url(#ig)')+'<rect x="13" y="13" width="34" height="34" rx="10" stroke="white" stroke-width="4" fill="none"/><circle cx="30" cy="30" r="8" stroke="white" stroke-width="4" fill="none"/><circle cx="40" cy="20" r="2.5" fill="white"/>'),
+      photos: svg(base('white')+Array.from({length:8},(_,i)=>`<ellipse cx="30" cy="20" rx="7" ry="12" fill="${['#f45b68','#fba246','#fbd343','#8bc875','#53c6ca','#66a5ee','#9d86c7','#d57bbb'][i]}" fill-opacity=".85" transform="rotate(${i*45} 30 30)"/>`).join(''))
+    };
+    const APPS = [
+      ['instagram','Instagram'], ['photos','Photos'], ['mail','Mail'], ['calendar','Calendar'],
+      ['clock','Clock'], ['notes','Notes'], ['weather','Weather'], ['settings','Settings'], ['maps','Maps']
+    ];
+    const DOCK = [['phone','Telepon'], ['safari','Safari'], ['messages','Pesan'], ['music','Music']];
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    function appButton([id,label], dock=false) {
+      return `<button class="app" type="button" data-open="${id}" aria-label="${escapeHtml(label)}"><span class="app-icon">${ICONS[id]}</span>${dock?'':escapeHtml(label)}${id==='mail'?'<span class="badge">2</span>':''}</button>`;
+    }
+    document.getElementById('app-grid').innerHTML = APPS.map(app=>appButton(app)).join('');
+    document.getElementById('app-dock').innerHTML = DOCK.map(app=>appButton(app,true)).join('');
+    document.querySelector('.notification-icon').innerHTML = ICONS.messages;
+    document.querySelector('.notification-icon').style.cssText='width:40px;height:40px;padding:0;flex-shrink:0;background:none';
+    document.getElementById('widget-city').textContent=WEATHER.city;
+
+
+    // Wallpaper file untuk semua pembaca; pilihan Settings tersimpan di browser ini.
+    const wallpaperElement=document.querySelector('.wallpaper');
+    const fallbackWallpaper=getComputedStyle(wallpaperElement).backgroundImage;
+    const wallpaperKey='au-phone-wallpaper-v1';
+    function applyWallpaper(source) {
+      wallpaperElement.style.backgroundImage=`url(${JSON.stringify(source)}), ${fallbackWallpaper}`;
+    }
+    let savedWallpaper=null;
+    try { savedWallpaper=localStorage.getItem(wallpaperKey); } catch {}
+    applyWallpaper(savedWallpaper || WALLPAPER);
+    const panel=document.getElementById('panel-content');
+    let gallery=[...GALLERY];
+    let galleryURLs=[];
+    const initialDate=new Date();
+    let calendarMonth=initialDate.getMonth(), calendarYear=initialDate.getFullYear(), selectedDay=initialDate.getDate();
+    let activeApp=null;
+    let stopwatchRunning=false, stopwatchElapsed=0, stopwatchStarted=0;
+    let musicURL=null;
+    const noteButton=(note,i)=>`<button class="list-row" type="button" data-note="${i}"><strong>${escapeHtml(note.title)}</strong><small>${escapeHtml(note.text.split('\n')[0])}</small></button>`;
+    function fileControl(id,label,accept,multiple=false) {
+      return `<label class="primary file-label">${label}<input id="${id}" type="file" accept="${accept}" ${multiple?'multiple':''} hidden></label>`;
+    }
+    function renderCalendar() {
+      const start=new Date(calendarYear,calendarMonth,1).getDay();
+      const count=new Date(calendarYear,calendarMonth+1,0).getDate();
+      const key=`${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(selectedDay).padStart(2,'0')}`;
+      const events=STORY_EVENTS[key]||['Tidak ada agenda.'];
+      panel.innerHTML=`<button class="back" type="button" data-calendar-today>Hari ini</button><div class="month-header"><button type="button" data-month="-1" aria-label="Bulan sebelumnya">‹</button><strong>${new Date(calendarYear,calendarMonth).toLocaleDateString('id-ID',{month:'long',year:'numeric'})}</strong><button type="button" data-month="1" aria-label="Bulan berikutnya">›</button></div><div class="month-grid">${['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(d=>`<small>${d}</small>`).join('')}${'<span></span>'.repeat(start)}${Array.from({length:count},(_,i)=>`<button type="button" data-day="${i+1}" class="${selectedDay===i+1?'selected':''}" aria-label="Tanggal ${i+1}" aria-pressed="${selectedDay===i+1}">${i+1}</button>`).join('')}</div><div class="card" style="margin-top:20px"><h2>${selectedDay} ${new Date(calendarYear,calendarMonth).toLocaleDateString('id-ID',{month:'long'})}</h2>${events.map(e=>`<p>${escapeHtml(e)}</p>`).join('')}</div>`;
+    }
+    function renderGallery(instagram=false) {
+      panel.innerHTML=(instagram?'<div class="card"><h2>@karakter.au</h2><p>Potongan hari yang ingin kusimpan.</p><small>Profil fiksi AU</small></div>':'<p class="muted">Tambahkan nama file ke GALLERY di kode agar foto ikut tampil untuk pembaca. Foto yang dipilih lewat tombol ini hanya untuk sesi preview.</p>'+fileControl('gallery-input','Pilih foto','image/*',true))+`<div class="photo-grid">${gallery.map((src,i)=>`<button type="button" data-photo="${i}" aria-label="Lihat foto ${i+1}"><img src="${escapeHtml(src)}" alt="Foto AU ${i+1}"></button>`).join('')}</div>`+(!gallery.length?'<div class="card" style="margin-top:18px">Belum ada foto. Tambahkan foto melalui aplikasi Photos atau isi GALLERY di kode.</div>':'');
+    }
+    function openApp(id) {
+      if (!unlocked) { openPasscode(); return; }
+      if(id==='messages') { chatState.view='list'; showScreen('messages'); return; }
+      const title=[...APPS,...DOCK,['search','Search']].find(app=>app[0]===id)?.[1];
+      if(!title) return;
+      activeApp=id;
+      document.getElementById('panel-title').textContent=title;
+      showScreen('app-panel',false);
+      panel.scrollTop=0;
+      if(id==='calendar') renderCalendar();
+      if(id==='photos'||id==='instagram') renderGallery(id==='instagram');
+      if(id==='notes') panel.innerHTML='<p class="muted">CATATAN KARAKTER</p>'+NOTES.map(noteButton).join('');
+      if(id==='weather') { renderWeather(); refreshWeather(); }
+      if(id==='settings') panel.innerHTML='<div class="card"><h2>Wallpaper</h2><p>Pilih foto untuk lock screen dan home screen.</p>'+fileControl('wallpaper-input','Pilih wallpaper','image/*')+'<p class="muted">Pilihan di sini disimpan di browser kamu. Untuk wallpaper yang ikut dibagikan ke pembaca, gunakan file wallpaper.jpg di samping index.html.</p><button class="secondary" type="button" data-reset-wallpaper>Kembali ke wallpaper file</button><p id="wallpaper-feedback" role="status"></p></div><div class="card"><h2>Layar terkunci</h2><button class="primary" type="button" data-action="lock">Kunci ponsel</button></div>';
+      if(id==='clock') panel.innerHTML='<div class="card"><h2>Waktu perangkatmu</h2><p data-live-time style="font-size:40px;margin:10px 0"></p><small data-live-date-full></small><p class="muted" data-live-zone></p></div><div class="card"><h2>Stopwatch</h2><div id="stopwatch-time" class="stopwatch">00:00.0</div><div class="action-row"><button id="stopwatch-toggle" type="button" class="primary" data-stopwatch="toggle">'+(stopwatchRunning?'Pause':'Start')+'</button><button type="button" class="secondary" data-stopwatch="reset">Reset</button></div></div>';
+      if(id==='mail') panel.innerHTML='<p class="muted">INBOX · 2 PESAN</p><button class="list-row" type="button" data-mail="0"><strong>Perpustakaan</strong><small>Pengingat pengembalian buku</small></button><button class="list-row" type="button" data-mail="1"><strong>Panitia acara</strong><small>Konfirmasi pendaftaran</small></button>';
+      if(id==='maps') panel.innerHTML='<p class="muted">TEMPAT DALAM CERITA</p><div class="card"><h2>Kafe dekat kampus</h2><p>Meja di sebelah jendela. Tempat pertemuan jam 16.00.</p></div><div class="card"><h2>Perpustakaan</h2><p>Buku harus kembali sebelum Rabu.</p></div>';
+      if(id==='phone') panel.innerHTML='<p class="muted">RIWAYAT PANGGILAN FIKSI</p><div class="card"><h2>Nomor tak dikenal</h2><p style="color:#ff3b30">Panggilan tak terjawab</p><small>Hari ini · 20.58</small></div><div class="card"><h2>Ibu</h2><p>Panggilan masuk · 4 menit</p><small>Kemarin · 18.30</small></div>';
+      if(id==='safari') panel.innerHTML='<div class="card"><h2>Reading list</h2><p>Hal-hal yang belum sempat kubaca.</p><button type="button" class="list-row" data-open="notes"><strong>Catatan yang disimpan</strong><small>Buka Notes</small></button><button type="button" class="list-row" data-open="maps"><strong>Tempat yang ingin dikunjungi</strong><small>Buka tempat dalam cerita</small></button></div>';
+      if(id==='music') panel.innerHTML='<div class="card"><h2>Soundtrack AU</h2><p>Pilih file audio dari laptop untuk mencoba pemutar musik.</p>'+fileControl('music-input','Pilih audio','audio/*')+'<audio id="music-player" controls '+(musicURL?'src="'+escapeHtml(musicURL)+'"':'')+'></audio><p class="muted">Audio pilihan ini hanya tersedia dalam sesi preview ini.</p></div>';
+      if(id==='search') { panel.innerHTML='<label for="app-search" class="muted">CARI APLIKASI</label><input id="app-search" type="search" placeholder="Nama aplikasi…"><div id="search-results" class="search-results"></div>'; renderSearch(''); }
+      updateLiveTime();
+      document.querySelector('#app-panel .back').focus({preventScroll:true});
+    }
+    function renderSearch(query) {
+      const matches=[...APPS,...DOCK].filter(app=>app[1].toLowerCase().includes(query.toLowerCase()));
+      document.getElementById('search-results').innerHTML=matches.map(([id,label])=>`<button type="button" class="list-row" data-open="${id}">${label}</button>`).join('') || '<p>Tidak ada aplikasi yang cocok.</p>';
+    }
+    document.addEventListener('click',event=>{
+      const button=event.target.closest('button');
+      if(!button) return;
+      if(button.dataset.open) {
+        if(button.dataset.open==='calendar' && button.classList.contains('home-widget')) { const now=new Date(); calendarYear=now.getFullYear(); calendarMonth=now.getMonth(); selectedDay=now.getDate(); }
+        openApp(button.dataset.open);
+      }
+      if(button.hasAttribute('data-weather-refresh')) refreshWeather(true);
+      if(button.hasAttribute('data-calendar-today')) { const now=new Date(); calendarYear=now.getFullYear(); calendarMonth=now.getMonth(); selectedDay=now.getDate(); renderCalendar(); }
+      if(button.dataset.note!==undefined) { const note=NOTES[Number(button.dataset.note)]; panel.innerHTML='<button type="button" class="back" data-open="notes">‹ Semua catatan</button><h2>'+escapeHtml(note.title)+'</h2><div class="note-body">'+escapeHtml(note.text)+'</div>'; }
+      if(button.dataset.month) { calendarMonth+=Number(button.dataset.month); const d=new Date(calendarYear,calendarMonth); calendarMonth=d.getMonth(); calendarYear=d.getFullYear(); selectedDay=1; renderCalendar(); }
+      if(button.dataset.day) { selectedDay=Number(button.dataset.day); renderCalendar(); }
+      if(button.dataset.photo!==undefined) { const index=Number(button.dataset.photo); panel.innerHTML='<button type="button" class="back" data-open="photos">‹ Semua foto</button><img class="large-photo" src="'+escapeHtml(gallery[index])+'" alt="Foto AU '+(index+1)+'">'; }
+      if(button.dataset.mail!==undefined) { const mails=[['Pengingat pengembalian buku','Buku yang kamu pinjam jatuh tempo Rabu, 21 Oktober. Jangan lupa dikembalikan.'],['Konfirmasi pendaftaran','Pendaftaranmu sudah diterima. Sampai jumpa di acara hari Sabtu!']]; const mail=mails[Number(button.dataset.mail)]; panel.innerHTML='<button type="button" class="back" data-open="mail">‹ Inbox</button><div class="card"><h2>'+mail[0]+'</h2><p>'+mail[1]+'</p><small>Pesan fiksi AU</small></div>'; }
+      if(button.hasAttribute('data-reset-wallpaper')) { try { localStorage.removeItem(wallpaperKey); } catch {} applyWallpaper(WALLPAPER); document.getElementById('wallpaper-feedback').textContent='Kembali ke wallpaper.jpg. Jika belum ada filenya, latar gradasi akan tampil.'; }
+      if(button.dataset.stopwatch==='toggle') { if(stopwatchRunning) { stopwatchElapsed+=performance.now()-stopwatchStarted; stopwatchRunning=false; } else { stopwatchStarted=performance.now(); stopwatchRunning=true; } button.textContent=stopwatchRunning?'Pause':'Start'; }
+      if(button.dataset.stopwatch==='reset') { stopwatchRunning=false; stopwatchElapsed=0; document.getElementById('stopwatch-toggle').textContent='Start'; }
+      // Tombol kunci di Settings dibuat setelah halaman dimuat.
+      if(button.dataset.action==='lock'&&button.closest('#app-panel')) { unlocked=false; clearPin(); showScreen('lock'); }
+    });
+    document.addEventListener('input',event=>{ if(event.target.id==='app-search') renderSearch(event.target.value); });
+    document.addEventListener('change',async event=>{
+      const input=event.target;
+      if(input.id==='wallpaper-input'&&input.files[0]) {
+        const file=input.files[0];
+        const status=document.getElementById('wallpaper-feedback');
+        if(!file.type.startsWith('image/')) { status.textContent='Pilih file gambar JPG, PNG, atau WebP.'; return; }
+        const reader=new FileReader();
+        reader.onload=()=>{
+          const image=new Image();
+          image.onload=()=>{ applyWallpaper(reader.result); let message='Wallpaper diganti dan tersimpan di browser ini.'; try {localStorage.setItem(wallpaperKey,reader.result);} catch { try {localStorage.removeItem(wallpaperKey);} catch {} message='Wallpaper diganti untuk sesi ini. File terlalu besar atau penyimpanan browser tidak tersedia.'; } if(document.getElementById('wallpaper-feedback')) document.getElementById('wallpaper-feedback').textContent=message; };
+          image.onerror=()=>{ if(document.getElementById('wallpaper-feedback')) document.getElementById('wallpaper-feedback').textContent='Gambar tidak dapat dibuka. Coba JPG atau PNG.'; };
+          image.src=reader.result;
+        };
+        reader.onerror=()=>{ if(status.isConnected) status.textContent='File gagal dibaca. Coba pilih lagi.'; };
+        reader.readAsDataURL(file);
+      }
+      if(input.id==='gallery-input') { for(const url of galleryURLs) URL.revokeObjectURL(url); galleryURLs=Array.from(input.files).filter(f=>f.type.startsWith('image/')).map(file=>URL.createObjectURL(file)); gallery=[...GALLERY,...galleryURLs]; renderGallery(); }
+      if(input.id==='music-input'&&input.files[0]) { if(musicURL) URL.revokeObjectURL(musicURL); musicURL=URL.createObjectURL(input.files[0]); document.getElementById('music-player').src=musicURL; }
+    });
+    setInterval(()=>{
+      const timer=document.getElementById('stopwatch-time'); if(!timer) return;
+      const ms=stopwatchElapsed+(stopwatchRunning?performance.now()-stopwatchStarted:0);
+      timer.textContent=String(Math.floor(ms/60000)).padStart(2,'0')+':'+String(Math.floor(ms/1000)%60).padStart(2,'0')+'.'+Math.floor(ms/100)%10;
+    },100);
+
+
+    // ===== WAKTU LOKAL PEMBACA =====
+    function localDateKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    }
+    function timeText(date, timeZone) {
+      return new Intl.DateTimeFormat('en-GB',{hour:'2-digit',minute:'2-digit',hourCycle:'h23',...(timeZone?{timeZone}:{})}).format(date);
+    }
+    let lastLocalDateKey='';
+    function updateLiveTime() {
+      const now=new Date();
+      document.querySelectorAll('[data-live-time]').forEach(el=>{el.textContent=timeText(now);});
+      document.querySelectorAll('[data-live-date]').forEach(el=>{el.textContent=now.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'});});
+      document.querySelectorAll('[data-live-date-full]').forEach(el=>{el.textContent=now.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});});
+      document.querySelectorAll('[data-live-zone]').forEach(el=>{el.textContent=Intl.DateTimeFormat().resolvedOptions().timeZone;});
+      document.querySelectorAll('[data-clock-hour]').forEach(el=>el.setAttribute('transform',`rotate(${(now.getHours()%12)*30+now.getMinutes()/2} 30 30)`));
+      document.querySelectorAll('[data-clock-minute]').forEach(el=>el.setAttribute('transform',`rotate(${now.getMinutes()*6+now.getSeconds()/10} 30 30)`));
+      document.querySelectorAll('[data-clock-second]').forEach(el=>el.setAttribute('transform',`rotate(${now.getSeconds()*6} 30 30)`));
+      const dateKey=localDateKey(now);
+      if(dateKey!==lastLocalDateKey) {
+        // Saat melewati tengah malam, kalender mengikuti hari baru jika sedang melihat hari ini.
+        const selectedKey=`${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(selectedDay).padStart(2,'0')}`;
+        if(lastLocalDateKey && selectedKey===lastLocalDateKey) {
+          calendarYear=now.getFullYear(); calendarMonth=now.getMonth(); selectedDay=now.getDate();
+          if(currentScreen==='app-panel' && activeApp==='calendar') renderCalendar();
+        }
+        lastLocalDateKey=dateKey;
+        document.getElementById('widget-weekday').textContent=now.toLocaleDateString('id-ID',{weekday:'long'}).toUpperCase();
+        document.getElementById('widget-day').textContent=now.getDate();
+        document.querySelectorAll('[data-calendar-weekday]').forEach(el=>{el.textContent=now.toLocaleDateString('en-US',{weekday:'short'});});
+        document.querySelectorAll('[data-calendar-day]').forEach(el=>{el.textContent=now.getDate();});
+        const events=STORY_EVENTS[dateKey] || [];
+        document.getElementById('widget-event').textContent=events[0] || 'Tidak ada agenda hari ini';
+      }
+    }
+    // ===== CUACA TERBARU SEOUL: OPEN-METEO =====
+    // Kondisi current berasal dari model cuaca; browser mengambil ulang setiap 15 menit.
+    const WEATHER_REFRESH_MS=15*60*1000;
+    const weatherState={data:null, loading:false, error:false, fetchedAt:0};
+    function weatherDescription(code) {
+      const labels={0:'Cerah',1:'Sebagian besar cerah',2:'Cerah berawan',3:'Mendung',45:'Berkabut',48:'Kabut beku',51:'Gerimis ringan',53:'Gerimis',55:'Gerimis lebat',56:'Gerimis beku ringan',57:'Gerimis beku lebat',61:'Hujan ringan',63:'Hujan',65:'Hujan lebat',66:'Hujan beku ringan',67:'Hujan beku lebat',71:'Salju ringan',73:'Salju',75:'Salju lebat',77:'Butiran salju',80:'Hujan lokal ringan',81:'Hujan lokal',82:'Hujan lokal lebat',85:'Hujan salju ringan',86:'Hujan salju lebat',95:'Badai petir',96:'Petir dan hujan es',97:'Badai petir lebat',99:'Petir dan hujan es lebat'};
+      return labels[code] || 'Kondisi tidak diketahui';
+    }
+    function weatherSymbol(code, isDay=1) {
+      const sun='<circle cx="15" cy="14" r="7" fill="#ffda64"/><path d="M15 2v3m0 18v3M3 14h3m18 0h3M6 5l2 2m14 14 2 2M6 23l2-2M22 7l2-2" stroke="#ffda64" stroke-width="2"/>';
+      const moon='<path d="M21 3A12 12 0 1 0 29 23 13 13 0 0 1 21 3" fill="#f7ebbc"/>';
+      const cloud='<path d="M10 27a6 6 0 0 1 0-12 9 9 0 0 1 17-1 7 7 0 0 1 1 13Z" fill="#ecf1f8"/>';
+      let body=code<=1?(isDay?sun:moon):code===2?(isDay?sun:moon)+cloud:cloud;
+      if([45,48].includes(code)) body+='<path d="M5 29h24M9 33h23" stroke="#c1d3e7" stroke-width="2" stroke-linecap="round"/>';
+      if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) body+='<path d="M13 30l-2 4m10-4-2 4m10-4-2 4" stroke="#7ec9ff" stroke-width="2" stroke-linecap="round"/>';
+      if([71,73,75,77,85,86].includes(code)) body+='<g fill="white"><circle cx="12" cy="32" r="1.5"/><circle cx="21" cy="32" r="1.5"/><circle cx="30" cy="32" r="1.5"/></g>';
+      if([95,96,97,99].includes(code)) body+='<path d="M22 23l-6 8h5l-3 7 11-11h-7l4-4Z" fill="#ffde66"/>';
+      return `<svg viewBox="0 0 38 38" aria-hidden="true">${body}</svg>`;
+    }
+    function seoulDateKey(date) {
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:WEATHER.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+      const value=type=>parts.find(part=>part.type===type).value;
+      return `${value('year')}-${value('month')}-${value('day')}`;
+    }
+    function highLowText(data) {
+      const index=data.daily.time.findIndex(time=>seoulDateKey(new Date(time*1000))===seoulDateKey(new Date()));
+      if(index<0) return 'H:--° L:--°';
+      const high=data.daily.temperature_2m_max[index],low=data.daily.temperature_2m_min[index];
+      return `H:${Number.isFinite(high)?Math.round(high):'--'}° L:${Number.isFinite(low)?Math.round(low):'--'}°`;
+    }
+    function updateWeatherWidget() {
+      const data=weatherState.data;
+      document.getElementById('widget-city').textContent=WEATHER.city;
+      document.getElementById('widget-temp').textContent=data?Math.round(data.current.temperature_2m)+'°':'--°';
+      document.getElementById('widget-condition').textContent=data?weatherDescription(data.current.weather_code):weatherState.error?'Cuaca tidak tersedia':'Memuat cuaca…';
+      document.getElementById('widget-high-low').textContent=data?(weatherState.error?'Pembaruan gagal · data terakhir':highLowText(data)):weatherState.error?'Klik untuk coba lagi':'Menghubungkan…';
+      document.getElementById('widget-weather-symbol').innerHTML=data?weatherSymbol(data.current.weather_code,data.current.is_day):'';
+      document.querySelector('.weather-widget').classList.toggle('night',!!data && data.current.is_day===0);
+    }
+    function renderWeather() {
+      const data=weatherState.data;
+      const attribution='<p class="weather-attribution">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></p>';
+      if(!data) {
+        panel.innerHTML='<div class="card"><h2>'+escapeHtml(WEATHER.city)+'</h2><p role="status">'+(weatherState.error?'Cuaca belum bisa dimuat. Periksa koneksi internet lalu coba lagi.':'Mengambil cuaca terbaru Seoul…')+'</p><button class="primary" type="button" data-weather-refresh '+(weatherState.loading?'disabled':'')+'>'+(weatherState.loading?'Memuat…':'Coba lagi')+'</button></div>'+attribution;
+        return;
+      }
+      const current=data.current;
+      const updated=new Date(current.time*1000).toLocaleString('id-ID',{timeZone:WEATHER.timeZone,day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+      const upcoming=data.hourly.time.map((time,index)=>({time,index})).filter(item=>item.time>=Math.floor(Date.now()/3600000)*3600).slice(0,6);
+      panel.innerHTML=`<div class="card weather-card ${current.is_day===0?'night':''}"><h2>${escapeHtml(WEATHER.city)}</h2><div class="weather-symbol">${weatherSymbol(current.weather_code,current.is_day)}</div><span class="temperature">${Math.round(current.temperature_2m)}°</span><p>${escapeHtml(weatherDescription(current.weather_code))}</p><small>${highLowText(data)}</small><p class="weather-update">Data: ${escapeHtml(updated)} KST</p></div><div class="card"><h2>Prakiraan per jam · Seoul</h2><div class="hourly">${upcoming.map(({time,index})=>`<div>${timeText(new Date(time*1000),WEATHER.timeZone)}<div style="width:32px;height:32px;margin:auto">${weatherSymbol(data.hourly.weather_code[index],data.hourly.is_day[index])}</div>${Number.isFinite(data.hourly.temperature_2m[index])?Math.round(data.hourly.temperature_2m[index]):'--'}°</div>`).join('')}</div><p class="muted">Jam cuaca memakai waktu Seoul (KST).</p></div><p role="status" class="muted">${weatherState.error?'Pembaruan gagal. Menampilkan data terakhir yang berhasil dimuat.':weatherState.loading?'Memperbarui…':'Diperbarui otomatis setiap 15 menit.'}</p><button class="primary" type="button" data-weather-refresh ${weatherState.loading?'disabled':''}>${weatherState.loading?'Memuat…':'Perbarui cuaca'}</button>${attribution}`;
+    }
+    async function refreshWeather(force=false) {
+      if(weatherState.loading || (!force && weatherState.data && Date.now()-weatherState.fetchedAt<WEATHER_REFRESH_MS)) return;
+      weatherState.loading=true;
+      updateWeatherWidget();
+      if(currentScreen==='app-panel' && activeApp==='weather') renderWeather();
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),12000);
+      try {
+        const params=new URLSearchParams({latitude:String(WEATHER.latitude),longitude:String(WEATHER.longitude),current:'temperature_2m,weather_code,is_day',hourly:'temperature_2m,weather_code,is_day',daily:'temperature_2m_max,temperature_2m_min',timezone:WEATHER.timeZone,timeformat:'unixtime',forecast_days:'2'});
+        const response=await fetch('https://api.open-meteo.com/v1/forecast?'+params,{signal:controller.signal});
+        if(!response.ok) throw new Error('Weather HTTP '+response.status);
+        const data=await response.json();
+        if(!Number.isFinite(data.current?.temperature_2m)||!Number.isFinite(data.current?.weather_code)||!Number.isFinite(data.current?.time)||![0,1].includes(data.current?.is_day)||!Array.isArray(data.daily?.time)||!Array.isArray(data.daily?.temperature_2m_max)||!Array.isArray(data.daily?.temperature_2m_min)||!Array.isArray(data.hourly?.time)||!Array.isArray(data.hourly?.temperature_2m)||!Array.isArray(data.hourly?.weather_code)||!Array.isArray(data.hourly?.is_day)) throw new Error('Invalid weather data');
+        weatherState.data=data;
+        weatherState.fetchedAt=Date.now();
+        weatherState.error=false;
+      } catch {
+        weatherState.error=true;
+      } finally {
+        clearTimeout(timeout);
+        weatherState.loading=false;
+        updateWeatherWidget();
+        if(currentScreen==='app-panel' && activeApp==='weather') renderWeather();
+      }
+    }
+
+    // ===== MESIN CHAT: biasanya tidak perlu kamu ubah =====
+    const chatState={
+      view:'list', messages:[], unread:0, stepIndex:0, typed:0,
+      keyboardOpen:false, waiting:false, typing:false, autoStarted:false,
+      bannerTimer:null, lastPhotoFocus:null, keyboardNumbers:false
+    };
+    const chatLog=document.getElementById('chat-log');
+    const composeButton=document.getElementById('chat-compose');
+    const keyboard=document.getElementById('chat-keyboard');
+    let chatMessageId=0;
+    function avatarMarkup() {
+      return `<span class="chat-avatar" aria-hidden="true"><span>${escapeHtml(CHAT.contact.initial||'H')}</span>${CHAT.contact.photo?`<img src="${escapeHtml(CHAT.contact.photo)}" alt="">`:''}</span>`;
+    }
+    function messagePreview(message) {
+      return message?.type==='image'?'Foto':message?.text||'';
+    }
+    function conversationIsOpen() {
+      return currentScreen==='messages' && chatState.view==='conversation';
+    }
+    function updateChatBadges() {
+      document.querySelectorAll('[data-open="messages"]').forEach(button=>{
+        let badge=button.querySelector('.chat-badge');
+        if(chatState.unread) {
+          if(!badge) { badge=document.createElement('span'); badge.className='badge chat-badge'; button.appendChild(badge); }
+          badge.textContent=chatState.unread>99?'99+':chatState.unread;
+          button.setAttribute('aria-label',`Pesan, ${chatState.unread} belum dibaca`);
+        } else { badge?.remove(); button.setAttribute('aria-label','Pesan'); }
+      });
+    }
+    function updateLockNotification() {
+      const latest=[...chatState.messages].reverse().find(message=>message.from!=='me');
+      const notification=document.querySelector('.notification');
+      notification.hidden=!chatState.unread;
+      notification.querySelector('strong').textContent=CHAT.contact.name;
+      notification.querySelector('p').textContent=messagePreview(latest);
+    }
+    function renderContactList() {
+      const latest=chatState.messages.at(-1);
+      document.getElementById('chat-contact-row').innerHTML=(chatState.unread?'<span class="chat-unread-dot" aria-label="Pesan belum dibaca"></span>':'')+avatarMarkup()+`<span class="chat-contact-info"><span class="chat-contact-top"><strong>${escapeHtml(CHAT.contact.name)}</strong><time>${latest?timeText(latest.at):''} ›</time></span><p>${latest?.from==='me'?'Kamu: ':''}${escapeHtml(messagePreview(latest))}</p></span>`;
+    }
+    function renderMessages(forceScroll=false) {
+      const nearBottom=chatLog.scrollHeight-chatLog.scrollTop-chatLog.clientHeight<100;
+      document.getElementById('messages-list').hidden=chatState.view!=='list';
+      document.getElementById('chat-conversation').hidden=chatState.view!=='conversation';
+      renderContactList();
+      // Tambahkan hanya pesan baru agar pembaca layar tidak mengumumkan ulang seluruh percakapan.
+      if(!chatLog.firstChild) {
+        const intro=document.createElement('div'); intro.className='chat-intro';
+        const first=chatState.messages[0]?.at||new Date();
+        intro.innerHTML='<p class="imessage-service">iMessage</p><p class="chat-date">'+escapeHtml(first.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'}))+' · '+timeText(first)+'</p>';
+        chatLog.appendChild(intro);
+      }
+      chatLog.querySelector('.typing-bubble')?.remove();
+      chatState.messages.forEach(message=>{
+        if(chatLog.querySelector(`[data-message-id="${message.id}"]`)) return;
+        const row=document.createElement('div'); row.className='chat-row '+(message.from==='me'?'me':'hao'); row.dataset.messageId=message.id;
+        row.setAttribute('aria-label',(message.from==='me'?'Kamu':CHAT.contact.name)+', '+timeText(message.at));
+        if(message.type==='image') {
+          const photo=document.createElement('button'); photo.type='button'; photo.className='chat-photo'; photo.dataset.chatPhoto=message.src;
+          photo.setAttribute('aria-label','Buka foto: '+(message.alt||'Foto dalam percakapan'));
+          const image=document.createElement('img'); image.src=message.src; image.alt=message.alt||'Foto dalam percakapan';
+          image.addEventListener('error',()=>{ image.hidden=true; const text=document.createElement('span'); text.className='photo-error'; text.textContent='Foto tidak tersedia'; photo.appendChild(text); },{once:true});
+          photo.appendChild(image); row.appendChild(photo);
+        } else {
+          const bubble=document.createElement('div'); bubble.className='chat-message'; bubble.textContent=message.text||''; row.appendChild(bubble);
+        }
+        chatLog.appendChild(row);
+      });
+      chatLog.querySelector('.chat-receipt')?.remove();
+      const lastOutgoing=[...chatState.messages].reverse().find(message=>message.from==='me');
+      if(lastOutgoing) {
+        const receipt=document.createElement('div'); receipt.className='chat-receipt';
+        receipt.textContent=lastOutgoing.readAt?'Read '+timeText(lastOutgoing.readAt):'Delivered';
+        const outgoingRow=chatLog.querySelector(`[data-message-id="${lastOutgoing.id}"]`);
+        outgoingRow?.after(receipt);
+      }
+      if(chatState.typing) {
+        const indicator=document.createElement('div'); indicator.className='typing-bubble'; indicator.setAttribute('aria-label',CHAT.contact.name+' sedang mengetik');
+        indicator.innerHTML='<i></i><i></i><i></i>'; chatLog.appendChild(indicator);
+      }
+      updateComposer();
+      if(forceScroll||nearBottom) chatLog.scrollTop=chatLog.scrollHeight;
+      updateChatBadges(); updateLockNotification();
+    }
+    function currentReply() { return CHAT.steps[chatState.stepIndex]?.reply||''; }
+    function replyCharacters() { return Array.from(currentReply()); }
+    function updateComposer() {
+      const characters=replyCharacters();
+      const draft=characters.slice(0,chatState.typed).join('');
+      composeButton.textContent=draft||'iMessage';
+      composeButton.classList.toggle('placeholder',!draft);
+      composeButton.disabled=chatState.waiting||!characters.length;
+      composeButton.setAttribute('aria-expanded',String(chatState.keyboardOpen));
+      document.getElementById('chat-send').disabled=chatState.waiting||!characters.length||chatState.typed!==characters.length;
+      keyboard.hidden=!chatState.keyboardOpen;
+      document.getElementById('chat-hint').textContent=chatState.waiting?CHAT.contact.name+' sedang membalas…':!characters.length?'Percakapan selesai.':chatState.keyboardOpen?'Ketuk tombol keyboard atau ketik di laptop.':'Ketuk iMessage untuk membalas.';
+      const prediction=document.getElementById('keyboard-prediction');
+      if(prediction) { prediction.textContent=currentReply()||'iMessage'; prediction.disabled=chatState.waiting||!characters.length; }
+    }
+    function buildKeyboard() {
+      const rows=chatState.keyboardNumbers?['1234567890','-/:;()&@"',".,?!'"]:['qwertyuiop','asdfghjkl','zxcvbnm'];
+      keyboard.innerHTML='<button id="keyboard-prediction" class="keyboard-prediction" type="button" data-chat="complete-reply" aria-label="Isi balasan yang sudah ditentukan"></button>'+rows.map((row,index)=>`<div class="key-row ${index===1?'middle':''}">${index===2?'<button class="letter-key wide" type="button" data-chat="shift" aria-label="Shift">⇧</button>':''}${Array.from(row).map(letter=>`<button class="letter-key" type="button" data-chat="type" aria-label="Tombol ${escapeHtml(letter)}">${escapeHtml(letter)}</button>`).join('')}${index===2?'<button class="letter-key wide" type="button" data-chat="backspace" aria-label="Hapus huruf">⌫</button>':''}</div>`).join('')+'<div class="key-row keyboard-bottom"><button class="letter-key wide" type="button" data-chat="numbers">'+(chatState.keyboardNumbers?'ABC':'123')+'</button><button class="letter-key space" type="button" data-chat="type">space</button><button class="letter-key wide" type="button" data-chat="hide-keyboard" aria-label="Sembunyikan keyboard">⌄</button></div>';
+      updateComposer();
+    }
+    function openConversation() {
+      chatState.view='conversation'; chatState.unread=0;
+      document.getElementById('chat-banner').hidden=true;
+      clearTimeout(chatState.bannerTimer);
+      showScreen('messages',false); renderMessages(true);
+      document.querySelector('[data-chat="back-list"]').focus({preventScroll:true});
+    }
+    function showChatBanner(message) {
+      const banner=document.getElementById('chat-banner');
+      document.getElementById('banner-name').textContent=CHAT.contact.name;
+      document.getElementById('banner-text').textContent=messagePreview(message);
+      banner.hidden=false; clearTimeout(chatState.bannerTimer);
+      chatState.bannerTimer=setTimeout(()=>{banner.hidden=true;},CHAT.bannerDuration||6000);
+    }
+    function addChatMessage(message, notify=true) {
+      const entry={...message,id:++chatMessageId,at:new Date()};
+      chatState.messages.push(entry);
+      if(entry.from!=='me') {
+        const outgoing=[...chatState.messages].reverse().find(item=>item.from==='me');
+        if(outgoing) outgoing.readAt=new Date();
+        if(!conversationIsOpen()) chatState.unread++;
+        if(notify&&!conversationIsOpen()&&!['lock','passcode'].includes(currentScreen)) showChatBanner(entry);
+      }
+      renderMessages();
+      return entry;
+    }
+    function handleChatScreenChange(id) {
+      // Semua konfigurasi sudah dimuat sebelum perpindahan layar oleh pembaca.
+      if(typeof chatState==='undefined') return;
+      if(id!=='messages') {chatState.keyboardOpen=false;updateComposer();}
+      if(id==='messages') {
+        if(chatState.view==='conversation') chatState.unread=0;
+        document.getElementById('chat-banner').hidden=true;
+        renderMessages(true);
+      }
+      if(unlocked&&!chatState.autoStarted) {
+        chatState.autoStarted=true;
+        (CHAT.autoIncoming||[]).forEach(message=>{
+          setTimeout(()=>addChatMessage({...message,from:'hao'}),Math.max(0,Number(message.afterMs)||0));
+        });
+      }
+    }
+    function typeReply() {
+      if(chatState.waiting||!currentReply()) return;
+      chatState.typed=Math.min(chatState.typed+1,replyCharacters().length);
+      updateComposer();
+    }
+    function sleepChat(ms) { return new Promise(resolve=>setTimeout(resolve,ms)); }
+    async function sendChatReply() {
+      const step=CHAT.steps[chatState.stepIndex];
+      if(!step||chatState.waiting||chatState.typed!==replyCharacters().length) return;
+      chatState.waiting=true;chatState.keyboardOpen=false;
+      addChatMessage({from:'me',type:'text',text:step.reply},false);
+      if(step.replyImage) addChatMessage({from:'me',type:'image',src:step.replyImage,alt:step.replyImageAlt||'Foto yang kamu kirim'},false);
+      chatState.typed=0;renderMessages(true);
+      for(const incoming of step.incoming||[]) {
+        chatState.typing=true;renderMessages();
+        await sleepChat(Math.max(0,Number(incoming.delay??1400)));
+        chatState.typing=false;
+        addChatMessage({...incoming,from:'hao'});
+      }
+      chatState.stepIndex++;chatState.waiting=false;renderMessages();
+    }
+    function closeChatPhoto() {
+      document.getElementById('chat-lightbox').hidden=true;
+      chatState.lastPhotoFocus?.focus({preventScroll:true});
+    }
+    document.addEventListener('click',event=>{
+      const photo=event.target.closest('[data-chat-photo]');
+      if(photo) {
+        chatState.lastPhotoFocus=photo;
+        const image=document.getElementById('chat-lightbox-image');
+        image.hidden=false;document.getElementById('chat-photo-error').hidden=true;
+        image.src=photo.dataset.chatPhoto;image.alt=photo.querySelector('img')?.alt||'Foto dalam percakapan';
+        document.getElementById('chat-lightbox').hidden=false;
+        document.querySelector('[data-chat="close-photo"]').focus({preventScroll:true});
+        return;
+      }
+      const button=event.target.closest('[data-chat]');if(!button) return;
+      switch(button.dataset.chat) {
+        case 'open-contact': openConversation();break;
+        case 'back-list': chatState.view='list';chatState.keyboardOpen=false;renderMessages();document.getElementById('chat-contact-row').focus({preventScroll:true});break;
+        case 'show-keyboard': if(!chatState.waiting&&currentReply()){chatState.keyboardOpen=true;updateComposer();chatLog.scrollTop=chatLog.scrollHeight;}break;
+        case 'hide-keyboard':chatState.keyboardOpen=false;updateComposer();composeButton.focus({preventScroll:true});break;
+        case 'type':typeReply();break;
+        case 'backspace':if(!chatState.waiting){chatState.typed=Math.max(0,chatState.typed-1);updateComposer();}break;
+        case 'complete-reply':if(!chatState.waiting){chatState.typed=replyCharacters().length;updateComposer();}break;
+        case 'shift': keyboard.querySelectorAll('[data-chat="type"]').forEach(key=>{if(/^[a-z]$/i.test(key.textContent))key.textContent=key.textContent===key.textContent.toLowerCase()?key.textContent.toUpperCase():key.textContent.toLowerCase();});break;
+        case 'numbers':chatState.keyboardNumbers=!chatState.keyboardNumbers;buildKeyboard();break;
+        case 'send':sendChatReply();break;
+        case 'open-banner':if(unlocked)openConversation();else{pendingChatOpen=true;openPasscode();}break;
+        case 'dismiss-banner':document.getElementById('chat-banner').hidden=true;clearTimeout(chatState.bannerTimer);break;
+        case 'close-photo':closeChatPhoto();break;
+      }
+    });
+    document.addEventListener('keydown',event=>{
+      if(!document.getElementById('chat-lightbox').hidden) {
+        if(event.key==='Escape'){event.preventDefault();closeChatPhoto();}
+        if(event.key==='Tab'){event.preventDefault();document.querySelector('[data-chat="close-photo"]').focus();}
+        return;
+      }
+      if(!conversationIsOpen()||!chatState.keyboardOpen||event.ctrlKey||event.metaKey||event.altKey||event.isComposing) return;
+      if(event.key==='Enter') {event.preventDefault();sendChatReply();}
+      else if(event.key==='Backspace') {event.preventDefault();if(!chatState.waiting){chatState.typed=Math.max(0,chatState.typed-1);updateComposer();}}
+      else if(event.key==='Escape') {event.preventDefault();chatState.keyboardOpen=false;updateComposer();composeButton.focus({preventScroll:true});}
+      else if(event.key.length===1) {event.preventDefault();typeReply();}
+    });
+    document.addEventListener('error',event=>{
+      if(event.target.matches?.('.chat-avatar img')) event.target.hidden=true;
+    },true);
+    document.getElementById('chat-lightbox-image').addEventListener('error',()=>{document.getElementById('chat-lightbox-image').hidden=true;document.getElementById('chat-photo-error').hidden=false;});
+    document.getElementById('chat-contact-name').textContent=CHAT.contact.name;
+    document.getElementById('chat-header-avatar').innerHTML=avatarMarkup();
+    document.getElementById('banner-avatar').innerHTML=avatarMarkup();
+    chatLog.setAttribute('aria-label','Percakapan dengan '+CHAT.contact.name);
+    buildKeyboard();
+    (CHAT.initialMessages||[]).forEach(message=>addChatMessage(message,false));
+    renderMessages();
+
+    updateLiveTime();
+    refreshWeather();
+    setInterval(updateLiveTime,1000);
+    setInterval(()=>{if(!document.hidden) refreshWeather();},WEATHER_REFRESH_MS);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden){updateLiveTime();refreshWeather();}});
+    window.addEventListener('online',()=>refreshWeather(true));
+
+  </script>
+</body>
+</html>
